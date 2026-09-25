@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>JATIM FIRE GIS — Leaflet WebGIS</title>
+
+<!-- Leaflet CSS: primary CDN -->
+<link id="leaflet-css" rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;font-family:Arial,Helvetica,sans-serif;color:#17212b;background:#eef1f4}
+.app{height:100vh;display:flex;flex-direction:column}
+header{height:62px;flex:0 0 62px;background:#fff;border-bottom:1px solid #dfe3e7;display:flex;align-items:center;justify-content:space-between;padding:0 18px;z-index:1000}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:15px}
+.icon{width:34px;height:34px;border-radius:9px;background:#e53935;color:white;display:grid;place-items:center}
+.brand small{display:block;color:#7a858e;font-size:10px;font-weight:400;margin-top:2px}
+.status{font-size:10px;color:#7a858e}
+.main{display:flex;flex:1;min-height:0}
+.sidebar{width:300px;flex:0 0 300px;background:#fff;border-right:1px solid #dfe3e7;padding:15px;overflow:auto;z-index:900}
+h1{font-size:18px;margin:0 0 4px}.sub{font-size:11px;color:#7a858e;margin-bottom:15px}
+.card{border:1px solid #e1e5e9;border-radius:11px;padding:12px;margin-bottom:12px}
+.title{font-size:10px;font-weight:800;color:#68737d;letter-spacing:.4px;margin-bottom:9px}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.stat{background:#f6f7f8;border-radius:8px;padding:10px}.stat b{display:block;font-size:20px}.stat span{font-size:9px;color:#7c8790}
+label{display:block;font-size:10px;color:#606b75;margin:8px 0 5px}
+select{width:100%;padding:9px;border:1px solid #d8dde1;border-radius:8px;background:#fff;font-size:11px}
+.legend{display:flex;align-items:center;gap:7px;font-size:10px;margin:7px 0}.dot{width:11px;height:11px;border-radius:50%;box-shadow:0 0 0 1px #adb4ba;border:2px solid white}.red{background:#df2020}.orange{background:#f39a2b}.green{background:#28a35a}
+.notice{font-size:9px;line-height:1.45;color:#65717b;background:#fff8e8;border-left:3px solid #e3a800;border-radius:6px;padding:9px}
+.mapwrap{position:relative;flex:1;min-width:0;min-height:0}
+#map{position:absolute;inset:0;width:100%;height:100%;background:#dfe7ec}
+.map-title{position:absolute;left:12px;top:12px;z-index:700;background:white;border:1px solid #dfe3e7;border-radius:8px;padding:8px 10px;box-shadow:0 2px 8px #0001;font-size:11px}
+#loadError{display:none;position:absolute;z-index:2000;left:50%;top:50%;transform:translate(-50%,-50%);width:min(88%,420px);background:white;border:1px solid #ddd;border-radius:12px;padding:18px;box-shadow:0 8px 30px #0002;font-size:12px;line-height:1.5}
+#loadError b{font-size:15px}
+.leaflet-popup-content{font-size:12px;line-height:1.5}
+.badge{color:#fff;padding:3px 7px;border-radius:20px;font-size:10px;font-weight:700}
+@media(max-width:650px){
+ header{height:55px;flex-basis:55px;padding:0 10px}.status{display:none}.brand{font-size:13px}
+ .sidebar{position:absolute;left:8px;top:8px;width:250px;max-height:calc(100% - 16px);border:1px solid #dfe3e7;border-radius:11px;box-shadow:0 4px 16px #0002;z-index:800}
+}
+</style>
+</head>
+
+<body>
+<div class="app">
+<header>
+  <div class="brand"><div class="icon">🔥</div><div>JATIM FIRE GIS<small>Leaflet WebGIS • Titik Kebakaran Jawa Timur</small></div></div>
+  <div class="status">LEAFLET + OPENSTREETMAP</div>
+</header>
+
+<div class="main">
+<aside class="sidebar">
+  <h1>Monitoring Kebakaran</h1>
+  <div class="sub">Sebaran titik kebakaran di Jawa Timur</div>
+
+  <div class="card">
+    <div class="title">RINGKASAN</div>
+    <div class="stats">
+      <div class="stat"><b id="total">0</b><span>Total titik</span></div>
+      <div class="stat"><b id="high">0</b><span>Risiko tinggi</span></div>
+      <div class="stat"><b id="kab">0</b><span>Kab/Kota</span></div>
+      <div class="stat"><b>24 Jam</b><span>Periode contoh</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="title">FILTER</div>
+    <label>Kabupaten / Kota</label>
+    <select id="kabFilter"><option value="all">Semua wilayah</option></select>
+    <label>Level risiko</label>
+    <select id="riskFilter">
+      <option value="all">Semua level</option>
+      <option value="Tinggi">Tinggi</option>
+      <option value="Sedang">Sedang</option>
+      <option value="Rendah">Rendah</option>
+    </select>
+  </div>
+
+  <div class="card">
+    <div class="title">LEGENDA</div>
+    <div class="legend"><i class="dot red"></i> Risiko tinggi</div>
+    <div class="legend"><i class="dot orange"></i> Risiko sedang</div>
+    <div class="legend"><i class="dot green"></i> Risiko rendah</div>
+  </div>
+
+  <div class="notice"><b>Catatan:</b> seluruh titik merupakan data simulasi untuk demonstrasi WebGIS, bukan laporan kebakaran aktual.</div>
+</aside>
+
+<section class="mapwrap">
+  <div id="map"></div>
+  <div class="map-title"><b>PETA JAWA TIMUR</b><br><span style="font-size:9px;color:#7b858e">Leaflet + OpenStreetMap</span></div>
+  <div id="loadError">
+    <b>Peta Leaflet belum termuat</b><br><br>
+    Browser tidak berhasil memuat library Leaflet dari CDN. Pastikan internet aktif lalu buka ulang file ini.
+  </div>
+</section>
+</div>
+</div>
+
+<script>
+const fires=[
+ {kab:"Kab. Malang",lat:-8.1500,lng:112.5200,risk:"Tinggi",time:"21:10",area:"± 3,2 ha"},
+ {kab:"Kab. Malang",lat:-8.0300,lng:112.6800,risk:"Sedang",time:"19:42",area:"± 1,1 ha"},
+ {kab:"Kab. Lumajang",lat:-8.1800,lng:113.2200,risk:"Tinggi",time:"20:18",area:"± 4,5 ha"},
+ {kab:"Kab. Jember",lat:-8.2100,lng:113.7000,risk:"Sedang",time:"18:55",area:"± 1,8 ha"},
+ {kab:"Kab. Banyuwangi",lat:-8.3300,lng:114.2500,risk:"Rendah",time:"17:26",area:"± 0,4 ha"},
+ {kab:"Kab. Probolinggo",lat:-7.9000,lng:113.2200,risk:"Tinggi",time:"20:51",area:"± 2,7 ha"},
+ {kab:"Kab. Pasuruan",lat:-7.7500,lng:112.8200,risk:"Sedang",time:"19:12",area:"± 1,5 ha"},
+ {kab:"Kab. Sidoarjo",lat:-7.4700,lng:112.7100,risk:"Rendah",time:"16:40",area:"± 0,3 ha"},
+ {kab:"Kab. Mojokerto",lat:-7.5500,lng:112.4700,risk:"Sedang",time:"18:21",area:"± 0,9 ha"},
+ {kab:"Kab. Jombang",lat:-7.6000,lng:112.2400,risk:"Rendah",time:"15:33",area:"± 0,5 ha"},
+ {kab:"Kab. Kediri",lat:-7.8500,lng:112.0200,risk:"Sedang",time:"17:48",area:"± 1,2 ha"},
+ {kab:"Kab. Blitar",lat:-8.1000,lng:112.1500,risk:"Tinggi",time:"20:03",area:"± 2,1 ha"},
+ {kab:"Kab. Tuban",lat:-6.9000,lng:112.0500,risk:"Rendah",time:"14:52",area:"± 0,6 ha"},
+ {kab:"Kab. Bojonegoro",lat:-7.1500,lng:111.8800,risk:"Sedang",time:"18:06",area:"± 1,0 ha"},
+ {kab:"Kab. Madiun",lat:-7.6500,lng:111.5300,risk:"Rendah",time:"16:15",area:"± 0,4 ha"},
+ {kab:"Kab. Ponorogo",lat:-7.9500,lng:111.5000,risk:"Sedang",time:"17:05",area:"± 1,3 ha"},
+ {kab:"Kab. Pacitan",lat:-8.2000,lng:111.1000,risk:"Rendah",time:"13:44",area:"± 0,2 ha"},
+ {kab:"Kab. Situbondo",lat:-7.7200,lng:114.0100,risk:"Sedang",time:"18:37",area:"± 0,8 ha"}
+];
+
+function startLeaflet(){
+  if(typeof L!=="undefined"){ initMap(); return; }
+  const s=document.createElement("script");
+  s.src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+  s.onload=initMap;
+  s.onerror=()=>document.getElementById("loadError").style.display="block";
+  document.head.appendChild(s);
+}
+
+function initMap(){
+  const map=L.map("map",{zoomControl:true,preferCanvas:true}).setView([-7.9,112.55],8);
+
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{
+    maxZoom:19,
+    attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap contributors</a>'
+  }).addTo(map);
+
+  const layer=L.layerGroup().addTo(map);
+  const kabFilter=document.getElementById("kabFilter");
+  const riskFilter=document.getElementById("riskFilter");
+  const colors={Tinggi:"#df2020",Sedang:"#f39a2b",Rendah:"#28a35a"};
+
+  [...new Set(fires.map(x=>x.kab))].sort().forEach(k=>{
+    const o=document.createElement("option");o.value=k;o.textContent=k;kabFilter.appendChild(o);
+  });
+
+  function render(){
+    layer.clearLayers();
+    const kab=kabFilter.value, risk=riskFilter.value;
+    const a=fires.filter(x=>(kab==="all"||x.kab===kab)&&(risk==="all"||x.risk===risk));
+
+    a.forEach(x=>{
+      const m=L.circleMarker([x.lat,x.lng],{
+        radius:x.risk==="Tinggi"?10:8,
+        color:"#fff",
+        weight:2,
+        fillColor:colors[x.risk],
+        fillOpacity:.9
+      }).addTo(layer);
+
+      m.bindPopup(
+        "<b>🔥 "+x.kab+"</b><br>"+
+        "Risiko: <span class='badge' style='background:"+colors[x.risk]+"'>"+x.risk+"</span><br>"+
+        "Waktu deteksi: "+x.time+"<br>"+
+        "Estimasi area: "+x.area+"<br>"+
+        "Koordinat: "+x.lat.toFixed(4)+", "+x.lng.toFixed(4)
+      );
+    });
+
+    document.getElementById("total").textContent=a.length;
+    document.getElementById("high").textContent=a.filter(x=>x.risk==="Tinggi").length;
+    document.getElementById("kab").textContent=new Set(a.map(x=>x.kab)).size;
+  }
+
+  kabFilter.onchange=render;
+  riskFilter.onchange=render;
+  render();
+
+  setTimeout(()=>map.invalidateSize(true),250);
+  window.addEventListener("resize",()=>map.invalidateSize(true));
+}
+
+startLeaflet();
+</script>
+</body>
+</html>
